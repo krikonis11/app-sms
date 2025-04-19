@@ -1,1 +1,378 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fake Google Messages - Conversations</title>
+  <!-- Ενσωμάτωση γραμματοσειρών Roboto & Material Icons -->
+  <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    /* Γενικές ρυθμίσεις – Dark Mode */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Roboto', sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .screen {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    /* Οθόνη λίστας συνομιλιών */
+    #conversationList { overflow-y: auto; }
+    .list-header {
+      background-color: #1f1f1f;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+    .list-header h2 {
+      margin: 0;
+      font-size: 20px;
+      flex: 1;
+    }
+    .list-header .material-icons {
+      cursor: pointer;
+      color: #007bff;
+      font-size: 24px;
+    }
+    .conversation {
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .conversation:hover { background-color: #2a2a2a; }
+    .conversation-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .conversation-name { font-size: 16px; font-weight: 500; }
+    .conversation-timestamp { font-size: 12px; opacity: 0.7; }
+    .conversation-preview {
+      font-size: 14px;
+      color: #ccc;
+      margin-top: 4px;
+    }
+    /* Οθόνη λεπτομερούς συνομιλίας */
+    #conversationView {
+      display: none;
+      flex-direction: column;
+    }
+    .header {
+      background-color: #1f1f1f;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      height: 56px;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.1);
+    }
+    .header .back-button {
+      color: #007bff;
+      margin-right: 16px;
+      cursor: pointer;
+      font-size: 24px;
+    }
+    .header h1 {
+      font-size: 20px;
+      margin: 0;
+      font-weight: 500;
+    }
+    .chat-container {
+      flex: 1;
+      padding: 12px;
+      overflow-y: auto;
+      background-color: #121212;
+      display: flex;
+      flex-direction: column;
+    }
+    .message {
+      max-width: 75%;
+      margin-bottom: 8px;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.4;
+      word-wrap: break-word;
+      position: relative;
+    }
+    .message.sent {
+      background-color: #007bff;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+      cursor: pointer;
+    }
+    .message.received {
+      background-color: #2a2a2a;
+      color: #e0e0e0;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    .msg-text {
+      display: inline-block;
+    }
+    .timestamp {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+    .input-bar {
+      background-color: #1f1f1f;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+    }
+    .input-bar .icon {
+      font-size: 24px;
+      color: #007bff;
+      cursor: pointer;
+      margin: 0 8px;
+    }
+    .input-bar input {
+      flex: 1;
+      border: none;
+      background: none;
+      outline: none;
+      color: #e0e0e0;
+      font-size: 16px;
+      padding: 8px;
+    }
+    .input-bar button {
+      background: none;
+      border: none;
+      color: #007bff;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .notification {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #323232;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 100;
+    }
+    .notification.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <!-- Οθόνη λίστας συνομιλιών (δημιουργείται δυναμικά) -->
+  <div id="conversationList" class="screen"></div>
+  
+  <!-- Οθόνη προβολής συγκεκριμένης συνομιλίας -->
+  <div id="conversationView" class="screen">
+    <div class="header">
+      <span class="material-icons back-button" onclick="backToList()">arrow_back</span>
+      <h1 id="conversationTitle">Συνομιλία</h1>
+    </div>
+    <div class="chat-container" id="chatContainer">
+      <!-- Τα μηνύματα φορτώνονται δυναμικά εδώ -->
+    </div>
+    <div class="input-bar">
+      <span class="material-icons icon">insert_emoticon</span>
+      <span class="material-icons icon">attach_file</span>
+      <span class="material-icons icon">photo_camera</span>
+      <input type="text" id="messageInput" placeholder="Γράψε μήνυμα..." autocomplete="off">
+      <button onclick="sendMessage()"> 
+        <span class="material-icons">send</span>
+      </button>
+    </div>
+    <div class="notification" id="notification">Νέο μήνυμα!</div>
+  </div>
+  
+  <script>
+    // Δομή δεδομένων για συνομιλίες. Οι "Άγνωστοι" εμφανίζονται ως ξεχωριστές συνομιλίες.
+    const conversations = {
+      "Άγνωστος 1": [
+        { type: "received", text: "Ξέρεις περισσότερα απ’ όσα πρέπει.", timestamp: "20:09, 01-02-2025" }
+      ],
+      "Άγνωστος 2": [
+        { type: "received", text: "Δεν θα έχεις χρόνο να μιλήσεις σε κανέναν.", timestamp: "20:10, 02-02-2025" }
+      ],
+      "Άγνωστος 3": [
+        { type: "received", text: "Σταμάτα να ψάχνεις, αλλιώς θα είναι αργά.", timestamp: "20:11, 03-02-2025" }
+      ],
+      "Άγνωστος 4": [
+        { type: "received", text: "Ακόμα πιστεύεις ότι μπορείς να ξεφύγεις;", timestamp: "20:12, 04-02-2025" }
+      ],
+      "Άγνωστος 5": [
+        { type: "received", text: "Έρχομαι, ξέρω που είσαι!", timestamp: "20:13, 05-02-2025" }
+      ],
+      "John Doe": [
+        { type: "received", text: "Όλα καλά; Γιατί δεν μου απαντας; Σου έχω νέα!", timestamp: "14:45" },
+        { type: "sent", text: "Δεν μπορώ να μιλήσω ", timestamp: "14:46" }
+      ],
+      "Jane Smith": [
+        { type: "received", text: "Είμαι ελεύθερη απόψε. Θες;", timestamp: "13:30" },
+        { type: "sent", text: "Συγνώμη είμαι πολύ ζορισμένος! ", timestamp: "13:31" }
+      ]
+    };
 
+    // Δημιουργία HTML για κάθε συνομιλία στη λίστα
+    function populateConversationList() {
+      const convListDiv = document.getElementById("conversationList");
+      convListDiv.innerHTML = "";
+      
+      // Header για την λίστα συνομιλιών
+      const headerDiv = document.createElement("div");
+      headerDiv.className = "list-header";
+      headerDiv.innerHTML = `<h2>Μηνύματα</h2><span class="material-icons">create</span>`;
+      convListDiv.appendChild(headerDiv);
+      
+      // Δημιουργία στοιχείων για κάθε συνομιλία από το αντικείμενο
+      for (let convName in conversations) {
+        const conv = conversations[convName];
+        const convDiv = document.createElement("div");
+        convDiv.className = "conversation";
+        convDiv.onclick = function() {
+          openConversation(convName);
+        };
+
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "conversation-info";
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "conversation-name";
+        nameSpan.innerText = convName;
+        const tsSpan = document.createElement("span");
+        tsSpan.className = "conversation-timestamp";
+        // Χρησιμοποιούμε το πρώτο timestamp ως preview (μόνο η ώρα)
+        tsSpan.innerText = conv[0].timestamp.split(",")[0];
+        infoDiv.appendChild(nameSpan);
+        infoDiv.appendChild(tsSpan);
+        convDiv.appendChild(infoDiv);
+
+        const previewP = document.createElement("p");
+        previewP.className = "conversation-preview";
+        previewP.innerHTML = conv[0].text;
+        convDiv.appendChild(previewP);
+
+        convListDiv.appendChild(convDiv);
+      }
+    }
+    
+    populateConversationList();
+
+    // Δημιουργία στοιχείου μηνύματος με διαχωρισμό κειμένου και timestamp
+    function createMessageElement(msg, convName, index) {
+      const msgDiv = document.createElement('div');
+      msgDiv.classList.add('message', msg.type);
+
+      const textSpan = document.createElement('span');
+      textSpan.classList.add('msg-text');
+      textSpan.innerHTML = msg.text; // Επιτρέποντας το <br>
+      msgDiv.appendChild(textSpan);
+      
+      msgDiv.appendChild(document.createElement('br'));
+      
+      const tsSpan = document.createElement('span');
+      tsSpan.classList.add('timestamp');
+      tsSpan.innerText = msg.timestamp;
+      msgDiv.appendChild(tsSpan);
+      
+      // Αποθήκευση του index για δυναμική επεξεργασία
+      msgDiv.setAttribute('data-index', index);
+
+      // Επεξεργασία μέσω διπλού κλικ, μόνο για εξερχόμενα μηνύματα
+      if (msg.type === "sent") {
+        msgDiv.ondblclick = function() {
+          editMessage(msgDiv, convName);
+        };
+      }
+      return msgDiv;
+    }
+
+    // Άνοιγμα συγκεκριμένης συνομιλίας
+    function openConversation(name) {
+      document.getElementById('conversationList').style.display = 'none';
+      document.getElementById('conversationView').style.display = 'flex';
+      document.getElementById('conversationTitle').innerText = name;
+      
+      loadConversationMessages(name);
+    }
+
+    // Φόρτωση μηνυμάτων της συγκεκριμένης συνομιλίας
+    function loadConversationMessages(name) {
+      const chatContainer = document.getElementById('chatContainer');
+      chatContainer.innerHTML = "";
+      
+      const conv = conversations[name];
+      if (conv) {
+        conv.forEach((msg, index) => {
+          const msgElem = createMessageElement(msg, name, index);
+          chatContainer.appendChild(msgElem);
+        });
+      } else {
+        chatContainer.innerHTML = `<div style="text-align:center; margin-top:20px;">Δεν υπάρχουν μηνύματα.</div>`;
+      }
+    }
+
+    // Επιστροφή στη λίστα συνομιλιών
+    function backToList() {
+      document.getElementById('conversationView').style.display = 'none';
+      document.getElementById('conversationList').style.display = 'flex';
+    }
+
+    // Επεξεργασία μηνύματος (μόνο για εξερχόμενα)
+    function editMessage(msgDiv, convName) {
+      const index = msgDiv.getAttribute('data-index');
+      const textSpan = msgDiv.querySelector('.msg-text');
+      const currentText = textSpan.innerText;
+      const newText = prompt("Επεξεργασία μηνύματος:", currentText);
+      if (newText !== null && newText.trim() !== "") {
+        textSpan.innerText = newText;
+        conversations[convName][index].text = newText;
+      }
+    }
+
+    // Αποστολή νέου μηνύματος
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const msgText = input.value.trim();
+      if (msgText === "") return;
+      
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const timestampText = `${hours}:${minutes}`;
+      
+      const newMsg = { type: "sent", text: msgText, timestamp: timestampText };
+      const convName = document.getElementById('conversationTitle').innerText;
+      
+      if (conversations[convName]) {
+        conversations[convName].push(newMsg);
+      } else {
+        conversations[convName] = [newMsg];
+      }
+      
+      const chatContainer = document.getElementById('chatContainer');
+      const newMsgElem = createMessageElement(newMsg, convName, conversations[convName].length - 1);
+      chatContainer.appendChild(newMsgElem);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      
+      input.value = "";
+      showNotification("Μήνυμα εστάλη");
+    }
+
+    // Προσομοίωση ειδοποίησης (toast)
+    function showNotification(text) {
+      const notification = document.getElementById("notification");
+      notification.innerText = text;
+      notification.classList.add("show");
+      setTimeout(() => { notification.classList.remove("show"); }, 2000);
+    }
+  </script>
+</body>
+</html>
